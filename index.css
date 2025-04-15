@@ -1,0 +1,66 @@
+launchpadcontroller{
+
+	position: fixed;
+	top: 0px;
+	left: 0px;
+	display: block;
+
+	--grid: 40px;
+	--red: #D9297B; /* same as pink */
+	--yellow: #F2C849;
+	--green: #A7C342;
+	--cyan: #10CFDC;
+	--blue: #0098FF;
+	--purple: #A100F7;
+	--pink: #D9297B;
+	--gray: #111;
+	--black: black;
+	--white: white;
+}
+
+launchpadsim[dirty="true"] launchpadname:after{
+	content: " *";
+	color: var(--red);
+}
+
+launchpadname{
+	display: block;
+	color: white;
+	text-transform: uppercase;
+	width: calc( var(--grid) * 4 );
+	overflow: hidden;
+	white-space: nowrap;
+	font-size: 10px;
+}
+
+launchpadsim{
+	display: inline-block;
+	text-align: left;
+	margin: calc( var(--grid)/2 );
+	position: relative;
+
+}
+
+launchpadsim td{
+	
+	width: 20px;
+	height: 20px;
+}
+
+table{
+	position: relative;
+	border-collapse: collapse;
+	margin: none;
+}
+
+td{
+	box-shadow: inset 0px 0px 5px rgba(255,255,255,0.3);
+	width: var(--grid);
+	height: var(--grid);
+	position: relative;
+	padding: 0px;
+	box-sizing: border-box;
+	white-space: nowrap;
+	text-align: right;
+	
+}

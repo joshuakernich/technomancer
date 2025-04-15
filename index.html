@@ -1,0 +1,449 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<meta charset="utf-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1">
+	<title></title>
+	<link rel="stylesheet" href="./index.css">
+	<script type="text/javascript" src="./jq.js"></script>
+	<script type="text/javascript" src="./AudioContext.js"></script>
+	<script type="text/javascript" src="./LaunchpadController.js"></script>
+	<script type="text/javascript">
+		$(function(){
+
+			const BASE = 'http://192.168.0.';
+			const API = '/cm?cmnd=';
+
+			const LOW = 10;
+			const HIGH = 25;
+
+			const COUNT = 40;
+
+			let audio = new AudioContext();
+			audio.add('boom','./audio/sfx-boom.mp3');
+			audio.add('on','./audio/sfx-on.mp3');
+			audio.add('off','./audio/sfx-off.mp3');
+
+			let bpm = 115;
+
+			const COLORS = {
+				'off':[0,0,0],
+				'white':[255,255,255,255],
+				'red':[255,0,0,0],
+				'green':[0,255,0,0],
+				'blue':[0,0,255,0],
+				'purple':[255,0,255,0],
+				'yellow':[255,255,0,0],
+			}
+
+			let littles = [];
+			let bigs = [];
+
+			let $anchor = $('<anchor>').appendTo('body');
+			for(var i=0; i<COUNT; i++){
+
+				let r = (i+0.5)/COUNT*Math.PI*2;
+
+				littles[i] = new Light(LOW+i);
+				littles[i].$el.appendTo($anchor).css({
+					left: Math.sin(r) * 40 + 'vh',
+					top: Math.cos(r) * 40 + 'vh',
+					transform: 'translate(-50%, -50%) rotate('+(-r)+'rad)',
+				});
+			}
+
+			let launchpad = new LaunchpadController(onPianoMessage);
+			launchpad.$el.appendTo('body');
+
+			const cycle = ['red','green','blue','purple','yellow'];
+			let nKey = -1;
+			function onPianoMessage(e){
+				//console.log(e.target.name);
+				if(e.data[0]==144 && e.data[2]>0) doMidiKey(e.target.name.includes('minilogue'));
+			}
+
+			let pianoPulse = [];
+			function doPianoKey(isMinilogue){
+				nKey++;
+				if(isMinilogue) doKorgKey();
+				else doPianoKey();
+				//for(var n in bigs) bigs[n].setColor(cycle[nKey%cycle.length]).commit();
+				//for(var n in littles) littles[n].setColor(cycle[nKey%cycle.length]).commit();
+			}
+
+			function doPianoKey(){
+				pianoPulse.push({ n:littles.length, dir:-1, color:'blue', min:COUNT/2, max:COUNT });
+			}
+
+			function doKorgKey(){
+				pianoPulse.push({ n:-1, dir:1, color:'red', min:0, max:COUNT/2 });
+			}
+
+			function Light(ip){
+
+				let self = this;
+				self.$el = $('<light>');
+				let backlog = [];
+
+				self.setOn = function(b) {
+					backlog.push( 'Power '+(b?'On':'Off'))
+					return self;
+				}
+				
+				self.setFade = function(b) {
+					backlog.push('Fade '+(b?'1':'0'));
+					return self;
+				}
+
+				self.setWhite = function(opacity=1){
+					backlog.push('Color 255,255,255,'+Math.floor(opacity*255));
+					return self;
+				}
+
+				self.setColor = function(colorName,opacity=1){
+
+					let color = COLORS[colorName];
+
+					self.setRGBWO(color[0],color[1],color[2],color[3],opacity);
+					return self;
+				}
+
+				self.setRGBWO = function(r,g,b,w,opacity=1) {
+					self.$el.css({
+						'background':'linear-gradient( to bottom, transparent, rgb('+r+','+g+','+b+'))',
+						'opacity':opacity,
+					})
+
+					backlog.push('Color '+
+					Math.floor(r*opacity)+
+					','+
+					Math.floor(g*opacity)+
+					','+
+					Math.floor(b*opacity)+
+					','+
+					Math.floor(w*opacity)
+					);
+					return self;
+				}
+
+				self.setSpeed = function( ms ){
+					//ms must be converted into a multiplier for 0.5s 
+					let nHalfSeconds = Math.round(ms/500);
+					backlog.push('Speed '+nHalfSeconds);
+					return self;
+				}
+
+				self.setSpeed2 = function( ms ){
+					//ms must be converted into a multiplier for 0.5s 
+					let nHalfSeconds = Math.round(ms/500);
+					backlog.push('Speed2 '+nHalfSeconds);
+					return self;
+				}
+
+				self.setDelay = function( ms ){
+					//ms must be converted into a multiplier for 0.1s 
+					let nTenthSeconds = Math.round(ms/100);
+					backlog.push('Delay '+nTenthSeconds);
+					return self;
+				}
+
+				self.init = function() {
+					self.setOn(true).setFade(false).setSpeed(0).setColor('green').commit(false);
+					return self;
+				}
+
+				self.commit = function(skipToEnd=true){
+					if(backlog.length){
+						backlog = [ backlog[backlog.length-1] ];
+						self.send();
+					}
+					return self;
+				}
+
+				let cntFetch = 0;
+				let noCors = {mode:'no-cors'};
+				self.send = function(){
+					let cmnd;
+					cmnd = 'Backlog '+backlog.join('%3B').replaceAll(' ','%20');
+					backlog.length = 0;
+					cntFetch++;
+					fetch(BASE+ip+API+cmnd, { signal: AbortSignal.timeout(2000) }).then(onFetch).catch(onCatch);
+				}
+
+				function onFetch(e){
+					self.$el.attr('state','connected');
+				}
+
+				function onCatch(e){
+					//console.log(ip,'ERROR',e);
+					self.$el.attr('state','error');
+				}
+
+				self.init();
+			}
+
+			function shuffle(array) {
+			  let currentIndex = array.length;
+
+			  // While there remain elements to shuffle...
+			  while (currentIndex != 0) {
+
+			    // Pick a remaining element...
+			    let randomIndex = Math.floor(Math.random() * currentIndex);
+			    currentIndex--;
+
+			    // And swap it with the current element.
+			    [array[currentIndex], array[randomIndex]] = [
+			      array[randomIndex], array[currentIndex]];
+			  }
+			}
+
+
+			let nRed = -1;
+			function doNextRed(){
+				nRed++;
+				littles[nRed].setColor('red').commit();
+			}
+
+			let nSpin = 0;
+			let colorStep = 'red';
+			function doStepSpin(){
+				let nPrev = (nSpin-10+littles.length)%littles.length;
+				littles[nPrev].setColor('off').commit();
+				nSpin = (nSpin+1)%littles.length;
+				littles[nSpin].setColor(colorStep).commit();
+			}
+
+			function doStepCandle(){
+				let n = Math.floor(Math.random()*littles.length);
+				littles[n].setRGBWO(120+Math.random()*20,50+Math.random()*20,0,0,Math.random()).commit();
+			}
+
+			function doStepOff(){
+				let next = pendingOff.pop();
+				if(next) next.setColor('off').commit();
+				else{
+					setColor('off');
+					fnStep = undefined;
+				}
+			}
+
+			function doColor(color, opacity=1){
+				for(var n in littles) littles[n].setColor(color, opacity).commit();
+			}
+
+			function addButton(str,fn){
+				$(`<button>${str}</button>`).appendTo('debug').click(fn);
+			}
+
+			let pendingOff = [];
+			function doTwinkleOff(){
+				pendingOff = littles.concat();
+				shuffle(pendingOff);
+				fnStep = doStepOff;
+			}
+
+			let nTwinkle = 0;
+			function doStepTwinkle(){
+
+				littles[nTwinkle].setColor('off').commit();
+				nTwinkle = Math.floor(Math.random()*littles.length);
+				littles[nTwinkle].setColor('white',0.1).commit();
+			}
+
+			function doPianoMode(){
+				doColor('off');
+				fnStep = doStepPianoPulse;
+			}
+
+			let colorPiano = 'red';
+			let pulseWidth = 5;
+			function doStepPianoPulse(){
+
+				for(var n in pianoPulse) pianoPulse[n].n += pianoPulse[n].dir;
+
+
+
+				// TO DO: CLEAR OLD PULSES
+				for(var n in pianoPulse) if( littles[ pianoPulse[n].n-pulseWidth*pianoPulse[n].dir ])littles[ pianoPulse[n].n-pulseWidth*pianoPulse[n].dir ].setColor('off');
+				for(var n in pianoPulse){
+					if( pianoPulse[n].n < pianoPulse[n].max &&
+						pianoPulse[n].n >= pianoPulse[n].min &&
+						littles[ pianoPulse[n].n ]) littles[ pianoPulse[n].n ].setColor( pianoPulse[n].color );
+				}
+
+				for(var n in littles ) littles[n].commit();
+			}
+
+
+			const FPS = 20;
+			let fnStep = undefined;
+			function step() {
+				if(fnStep) fnStep();
+			}
+
+			let timeStart = new Date().getTime();
+			setInterval(step,1000/FPS);
+
+			addButton('doTestNext',doNextRed);
+			addButton('doRedSpin',function(){ colorStep='red'; fnStep = doStepSpin; });
+			addButton('doBlueSpin',function(){ colorStep='blue'; fnStep = doStepSpin; });
+			addButton('doGreenSpin',function(){ colorStep='green'; fnStep = doStepSpin; });
+			addButton('doWhiteSpin',function(){ colorStep='white'; fnStep = doStepSpin; });
+			addButton('doCandles',function(){ doColor('off'); fnStep = doStepCandle; });
+
+			addButton('doRight',function(){ 
+				audio.play('on',true);
+				fnStep = undefined; 
+				for(var n=0; n<littles.length; n++) littles[n].setColor(n<littles.length/2?'blue':'off').commit(); 
+			})
+			addButton('doLeft',function(){ 
+				audio.play('off',true);
+				fnStep = undefined; 
+				for(var n=0; n<littles.length; n++) littles[n].setColor(n>=littles.length/2?'red':'off').commit(); 
+			})
+
+			addButton('doWhiteFlash',function(){ audio.play('boom',true); doColor('white', 1); doTwinkleOff(); })
+			addButton('doTwinkle',function(){ doColor('off'); fnStep = doStepTwinkle; })
+			addButton('doPianoMode',function(){ doPianoMode(); });
+			addButton('simulatePiano',function(){ doPianoKey(); });
+			addButton('simulateKorg',function(){ doKorgKey(); });
+			addButton('doOff',function(){ fnStep=undefined; doColor('off'); });
+		})
+
+		
+	</script>
+	<style type="text/css">
+		body{
+			background: black;
+			color: black;
+			font-family: monospace;
+			background: url(./bg.gif);
+			background-size: 110%;
+			background-position: center;
+
+			overflow: hidden;
+			width: 100vw;
+			height: 100vh;
+			margin: 0px;
+			padding: 0px;
+		}
+
+		bpm{
+			display: block;
+			color: white;
+			padding: 10px 0px;
+		}
+
+		bpm:before{
+			content: "";
+			width: 15px;
+			height: 15px;
+			border-radius: 100%;
+			background: white;
+			display: inline-block;
+			vertical-align: middle;
+			margin-right: 10px;
+		}
+
+		bpm:after{
+			content: "BPM";
+			display: inline-block;
+			vertical-align: middle;
+		}
+
+		bpm[on=true]:before{
+			opacity: 1;
+		}
+
+		bpm[on=false]:before{
+			opacity: 0;
+		}
+
+		anchor{
+			display: block;
+			position: absolute;
+			top: 50%;
+			left: 50%;
+			width: 0px;
+			height: 0px;
+		}
+
+		anchor:before{
+			content: "";
+			width: 50vh;
+			height: 50vh;
+			background: url(./sigil.png);
+			background-size: 100%;
+
+			display: block;
+			transform: translate(-50%, -50%);
+			position: absolute;
+			top: 0px;
+			left: 0px;
+		}
+
+		light{
+			position: absolute;
+			width: 20px;
+			height: 150px;
+			background: black;
+			
+			
+			display: block;
+			transform: translate(-50%, -50%);
+		}
+
+		light[state='connected']{
+			opacity: 1;
+		}
+
+		light[state='error']{
+			border: 1px solid red;
+		}
+
+		h1{
+			margin: 0px;
+			padding: 0px;
+			text-align: center;
+			font-size: 50px;
+			line-height: 100vh;
+			font-weight: bold;
+			text-shadow: -20px 20px 50px red, 20px -20px 50px blue; 
+		}
+
+		debug{
+			display: block;
+			position: fixed;
+			bottom: 0px;
+			left: 0px;
+			margin: 20px;
+		}
+
+		button{
+			display: block;
+			width: 150px;
+			font: inherit;
+			color: white;
+			text-align: left;
+			background: none;
+			border: none;
+			padding: 10px 0px;
+			position: relative;
+		}
+
+		button:after{
+			content: ">";
+			display: block;
+			position: absolute;
+			right: 0px;
+			top: 0px;
+			margin: 10px;
+		}
+
+	</style>
+</head>
+<body>
+	<debug></debug>
+</body>
+</html>
