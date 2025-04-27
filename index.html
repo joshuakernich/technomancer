@@ -20,6 +20,9 @@
 			const COUNT = 40;
 
 			let audio = new AudioContext();
+			audio.add('blip','./audio/sfx-blip.mp3');
+			audio.add('blip-low','./audio/sfx-blip-low.mp3');
+			audio.add('woosh','./audio/sfx-woosh.mp3');
 			audio.add('boom','./audio/sfx-boom.mp3');
 			audio.add('on','./audio/sfx-on.mp3');
 			audio.add('off','./audio/sfx-off.mp3');
@@ -36,6 +39,8 @@
 				'yellow':[255,255,0,0],
 			}
 
+			const PALETTE = ['red','green','blue','purple','yellow'];
+
 			let littles = [];
 			let bigs = [];
 
@@ -46,24 +51,33 @@
 
 				littles[i] = new Light(LOW+i);
 				littles[i].$el.appendTo($anchor).css({
-					left: Math.sin(r) * 40 + 'vh',
-					top: Math.cos(r) * 40 + 'vh',
-					transform: 'translate(-50%, -50%) rotate('+(-r)+'rad)',
+					left: Math.sin(-r) * 30 + 'vh',
+					top: Math.cos(-r) * 30 + 'vh',
+					transform: 'translate(-50%, -50%) rotate('+(r)+'rad)',
 				});
 			}
 
+			let $logo = $('<logo>').appendTo($anchor);
+
 			let launchpad = new LaunchpadController(onPianoMessage);
 			launchpad.$el.appendTo('body');
+			launchpad.listen(function(n,x,y,b){
+				
+				if(b) $(`button[x=${x}][y=${y}]`).click();
+			})
 
-			const cycle = ['red','green','blue','purple','yellow'];
+			
 			let nKey = -1;
 			function onPianoMessage(e){
 				//console.log(e.target.name);
 				if(e.data[0]==144 && e.data[2]>0) doMidiKey(e.target.name.includes('minilogue'));
 			}
 
+
 			let pianoPulse = [];
-			function doPianoKey(isMinilogue){
+			let nKorg = Math.round( littles.length * 0.25 );
+			let nPiano = Math.round( littles.length * 0.75 );
+			function doMidiKey(isMinilogue){
 				nKey++;
 				if(isMinilogue) doKorgKey();
 				else doPianoKey();
@@ -71,12 +85,18 @@
 				//for(var n in littles) littles[n].setColor(cycle[nKey%cycle.length]).commit();
 			}
 
-			function doPianoKey(){
-				pianoPulse.push({ n:littles.length, dir:-1, color:'blue', min:COUNT/2, max:COUNT });
+			function doKorgKey(){
+				nKorg = Math.round( (0.1 + Math.random() * 0.3)*littles.length );
+				/*if(pianoPulse.length && (pianoPulse[0].n + (pianoPulse[0].size+2)) > littles.length) return; // prevent overlap
+				pianoPulse.unshift({ n:littles.length, size:2, dir:-1, color:'blue', min:COUNT/2, max:COUNT });*/
 			}
 
-			function doKorgKey(){
-				pianoPulse.push({ n:-1, dir:1, color:'red', min:0, max:COUNT/2 });
+			function doPianoKey(){
+				
+				nPiano = Math.round( (0.6 + Math.random() * 0.3)*littles.length );
+				/*if(pianoPulse.length && (pianoPulse[0].n - (pianoPulse[0].size+1)) < 0) return; //prevent overlap
+				console.log('doKorgKey');
+				pianoPulse.unshift({ n:-1, size:2, dir:1, color:'red', min:0, max:COUNT/2 });*/
 			}
 
 			function Light(ip){
@@ -104,7 +124,7 @@
 
 					let color = COLORS[colorName];
 
-					self.setRGBWO(color[0],color[1],color[2],color[3],opacity);
+					self.setRGBWO(color[0],color[1],color[2],color[3],colorName=='off'?0:opacity);
 					return self;
 				}
 
@@ -167,7 +187,7 @@
 					cmnd = 'Backlog '+backlog.join('%3B').replaceAll(' ','%20');
 					backlog.length = 0;
 					cntFetch++;
-					fetch(BASE+ip+API+cmnd, { signal: AbortSignal.timeout(2000) }).then(onFetch).catch(onCatch);
+					//fetch(BASE+ip+API+cmnd, { signal: AbortSignal.timeout(2000) }).then(onFetch).catch(onCatch);
 				}
 
 				function onFetch(e){
@@ -214,6 +234,26 @@
 				littles[nSpin].setColor(colorStep).commit();
 			}
 
+			let arrSpin = [0,Math.floor(COUNT/3),Math.floor(COUNT/3*2)];
+			let arrColor = ['red','blue','green'];
+			function doStepRainbow(){
+				
+				for(i in arrSpin){
+					let nPrev = (arrSpin[i]-3+littles.length)%littles.length;
+					littles[nPrev].setColor('off').commit();
+
+					let nFade = (arrSpin[i]-1+littles.length)%littles.length;
+					littles[nFade].setColor(arrColor[i],0.5).commit();
+				}
+
+				for(i in arrSpin) arrSpin[i]++;
+
+				for(i in arrSpin){
+					let nNow = arrSpin[i]%littles.length;
+					littles[nNow].setColor(arrColor[i]).commit();
+				}
+			}
+
 			function doStepCandle(){
 				let n = Math.floor(Math.random()*littles.length);
 				littles[n].setRGBWO(120+Math.random()*20,50+Math.random()*20,0,0,Math.random()).commit();
@@ -223,17 +263,32 @@
 				let next = pendingOff.pop();
 				if(next) next.setColor('off').commit();
 				else{
-					setColor('off');
+					doColor('off');
 					fnStep = undefined;
 				}
 			}
 
 			function doColor(color, opacity=1){
-				for(var n in littles) littles[n].setColor(color, opacity).commit();
+				
+				for(var n in littles){
+					let c = (color=='random')?PALETTE[Math.floor(Math.random()*PALETTE.length)]:color;
+					littles[n].setColor(c, opacity).commit();
+				}
 			}
 
-			function addButton(str,fn){
-				$(`<button>${str}</button>`).appendTo('debug').click(fn);
+			let nx = -1;
+			let ny = 0;
+			let $btns = [];
+			function addButton(color,str,fn){
+				nx++;
+				launchpad.setXY(0,nx,ny,color);
+				$btns.push( $(`<button x=${nx} y=${ny}>${str}</button>`).appendTo('debug').click(fn) );
+			}
+
+			function addBreak(){
+				nx = -1;
+				ny++;
+				$('<br>').appendTo('debug');
 			}
 
 			let pendingOff = [];
@@ -243,9 +298,21 @@
 				fnStep = doStepOff;
 			}
 
+			let colorDecay = 'white';
+			function doDecay(color){
+				colorDecay = color;
+				nFade = FPDECAY + FPS/2;
+				fnStep = doDecayStep;
+			}
+
+			function doDecayStep(){
+				
+				if(FPDECAY<= FPDECAY && nFade >= 0 && nFade%FPFADESTEP==0) doColor(colorDecay,nFade/FPDECAY);
+				nFade--;
+			}
+
 			let nTwinkle = 0;
 			function doStepTwinkle(){
-
 				littles[nTwinkle].setColor('off').commit();
 				nTwinkle = Math.floor(Math.random()*littles.length);
 				littles[nTwinkle].setColor('white',0.1).commit();
@@ -253,19 +320,82 @@
 
 			function doPianoMode(){
 				doColor('off');
-				fnStep = doStepPianoPulse;
+				//fnStep = doStepPianoPulse;
+				fnStep = doStepPiano;
 			}
 
-			let colorPiano = 'red';
-			let pulseWidth = 5;
+			const FPDECAY = 30;
+			const FPFADESTEP = 2;
+
+			let nKorgWas = nKorg;
+			let nPianoWas = nPiano;
+
+			let colorKorg = [0,0,0,0];
+			let colorPiano = [0,0,0,0];
+
+			let decayMap = [];
+			for(var i in littles) decayMap[i] = -1;
+
+			function doStepPiano(){
+
+				if(nKorg != nKorgWas){
+					decayMap[nKorgWas-2] = 0;
+					decayMap[nKorgWas-1] = 0;
+					decayMap[nKorgWas] = 0;
+					decayMap[nKorgWas+1] = 0;
+					decayMap[nKorgWas+2] = 0;
+
+					nKorgWas = nKorg;
+
+					decayMap[nKorgWas-2] = 10;
+					decayMap[nKorgWas-1] = 15;
+					decayMap[nKorgWas] = 20;
+					decayMap[nKorgWas+1] = 15;
+					decayMap[nKorgWas+2] = 10;
+
+					colorKorg = [255,Math.floor(Math.random()*255),0,0];
+				}
+
+				if(nPiano != nPianoWas){
+
+					decayMap[nPianoWas-2] = 0;
+					decayMap[nPianoWas-1] = 0;
+					decayMap[nPianoWas] = 0;
+					decayMap[nPianoWas+1]= 0;
+					decayMap[nPianoWas+2]= 0;
+
+					nPianoWas = nPiano;
+
+					decayMap[nPianoWas-2] = 10;
+					decayMap[nPianoWas-1] = 15;
+					decayMap[nPianoWas] = 20;
+					decayMap[nPianoWas+1] = 15;
+					decayMap[nPianoWas+2] = 10;
+
+					colorPiano = [0,Math.floor(Math.random()*255),100+Math.floor(Math.random()*155),0];
+				}
+
+				
+
+				for(var i in decayMap){
+					if(decayMap[i] >= 0 && decayMap[i]%FPFADESTEP==0){
+						let c =  i>littles.length/2?colorPiano:colorKorg;
+						littles[i].setRGBWO( c[0], c[1], c[2], c[3], decayMap[i]/FPDECAY).commit();
+						//littles[i].setColor(, decayMap[i]/FPDECAY ).commit();
+					}
+				}
+				for(var i in decayMap) decayMap[i]--;
+			}	
+
+
+			
+
 			function doStepPianoPulse(){
 
 				for(var n in pianoPulse) pianoPulse[n].n += pianoPulse[n].dir;
 
 
-
-				// TO DO: CLEAR OLD PULSES
-				for(var n in pianoPulse) if( littles[ pianoPulse[n].n-pulseWidth*pianoPulse[n].dir ])littles[ pianoPulse[n].n-pulseWidth*pianoPulse[n].dir ].setColor('off');
+				for(var n in pianoPulse) if( littles[ pianoPulse[n].n-pianoPulse[n].size*pianoPulse[n].dir ])littles[ pianoPulse[n].n-pianoPulse[n].size*pianoPulse[n].dir ].setColor('off');
 				for(var n in pianoPulse){
 					if( pianoPulse[n].n < pianoPulse[n].max &&
 						pianoPulse[n].n >= pianoPulse[n].min &&
@@ -273,42 +403,91 @@
 				}
 
 				for(var n in littles ) littles[n].commit();
+
+				//CLEAR OLD PULSES (NOT WORKING)
+				for(var i=0; i<pianoPulse.length; i++){
+					let a = pianoPulse[i].n;
+					let b = pianoPulse[i].n - pianoPulse[i].size * pianoPulse[i].dir;
+					if(a < pianoPulse[i].min && b < pianoPulse[i].min && a > pianoPulse[i].max && b > pianoPulse[i].max){
+						pianoPulse.splice(i,1);
+						i--;
+					}
+				}
+
+				console.log(pianoPulse.length);
+
 			}
 
 
 			const FPS = 20;
 			let fnStep = undefined;
 			function step() {
+
 				if(fnStep) fnStep();
 			}
 
 			let timeStart = new Date().getTime();
 			setInterval(step,1000/FPS);
 
-			addButton('doTestNext',doNextRed);
-			addButton('doRedSpin',function(){ colorStep='red'; fnStep = doStepSpin; });
-			addButton('doBlueSpin',function(){ colorStep='blue'; fnStep = doStepSpin; });
-			addButton('doGreenSpin',function(){ colorStep='green'; fnStep = doStepSpin; });
-			addButton('doWhiteSpin',function(){ colorStep='white'; fnStep = doStepSpin; });
-			addButton('doCandles',function(){ doColor('off'); fnStep = doStepCandle; });
-
-			addButton('doRight',function(){ 
-				audio.play('on',true);
+			addButton('white','text-next',doNextRed);
+			
+			addBreak();
+			addButton('red','spin-r',function(){ colorStep='red'; fnStep = doStepSpin; });
+			addButton('green','spin-g',function(){ colorStep='green'; fnStep = doStepSpin; });
+			addButton('blue','spin-b',function(){ colorStep='blue'; fnStep = doStepSpin; });
+			addButton('white','spin-w',function(){ colorStep='white'; fnStep = doStepSpin; });
+			addBreak();
+			addButton('white','spin-rainbow',function(){ fnStep = doStepRainbow; });
+			addBreak();
+			addBreak();
+			addButton('red','left',function(){ 
+				audio.play('blip',true);
 				fnStep = undefined; 
-				for(var n=0; n<littles.length; n++) littles[n].setColor(n<littles.length/2?'blue':'off').commit(); 
+				for(var n=0; n<littles.length; n++) littles[n].setColor(n<littles.length/2?'red':'off').commit(); 
 			})
-			addButton('doLeft',function(){ 
-				audio.play('off',true);
+			addButton('blue','right',function(){ 
+				audio.play('blip-low',true);
 				fnStep = undefined; 
-				for(var n=0; n<littles.length; n++) littles[n].setColor(n>=littles.length/2?'red':'off').commit(); 
+				for(var n=0; n<littles.length; n++) littles[n].setColor(n>=littles.length/2?'blue':'off').commit(); 
 			})
+			
+			addButton('white','left-right',doLeftRight);
+			
+			function doLeftRight(){
+				audio.play('blip',true);
+				audio.play('blip-low',true);
+				for(var n=0; n<littles.length; n++) littles[n].setColor(n<littles.length/2?'red':'blue').commit(); 
+				nFocus = -5;
+				fnStep = doStepLeftRight;
+			}
 
-			addButton('doWhiteFlash',function(){ audio.play('boom',true); doColor('white', 1); doTwinkleOff(); })
-			addButton('doTwinkle',function(){ doColor('off'); fnStep = doStepTwinkle; })
-			addButton('doPianoMode',function(){ doPianoMode(); });
-			addButton('simulatePiano',function(){ doPianoKey(); });
-			addButton('simulateKorg',function(){ doKorgKey(); });
-			addButton('doOff',function(){ fnStep=undefined; doColor('off'); });
+			let nFocus = 0;
+			function doStepLeftRight(){
+				nFocus++;
+				if(nFocus>=0 && nFocus<=7){
+					littles[nFocus].setColor('off').commit();
+					littles[COUNT-nFocus-1].setColor('off').commit();
+					littles[COUNT/2-nFocus-1].setColor('off').commit();
+					littles[COUNT/2+nFocus].setColor('off').commit();
+				}
+				
+			}
+			
+			
+
+			addBreak();
+			addButton('white','flash',function(){ audio.play('boom',true); doColor('white', 1); doDecay('white'); });
+			addButton('white','woosh',function(){ audio.play('woosh',true); doColor('white'); fnStep = doStepRainbow; });
+			addButton('orange','candles',function(){ doColor('off'); fnStep = doStepCandle; });
+			addButton('yellow','twinkle',function(){ doColor('off'); fnStep = doStepTwinkle; });
+			addBreak();
+			addBreak();
+			addButton('white','midi-start',function(){ doPianoMode(); });
+			addButton('blue','midi-piano',function(){ doPianoKey(); });
+			addButton('red','midi-korg',function(){ doKorgKey(); });
+			addBreak();
+			
+			addButton('white','off',function(){ fnStep=undefined; doColor('off'); });
 		})
 
 		
@@ -369,29 +548,36 @@
 			height: 0px;
 		}
 
-		anchor:before{
+		logo{
 			content: "";
-			width: 50vh;
-			height: 50vh;
-			background: url(./sigil.png);
+			width: 80vh;
+			height: 80vh;
+			background: url(./logo.png);
 			background-size: 100%;
+			background-position: center;
+			background-repeat: no-repeat;
 
 			display: block;
 			transform: translate(-50%, -50%);
 			position: absolute;
 			top: 0px;
 			left: 0px;
+
+			mix-blend-mode: overlay;
+			
 		}
 
 		light{
 			position: absolute;
-			width: 20px;
-			height: 150px;
+			width: 72px;
+			height: 400px;
 			background: black;
 			
 			
 			display: block;
 			transform: translate(-50%, -50%);
+
+			clip-path: polygon(0% 100%, 100% 100%, 55% 0%, 45% 0%);
 		}
 
 		light[state='connected']{
@@ -399,7 +585,7 @@
 		}
 
 		light[state='error']{
-			border: 1px solid red;
+			/*border: 1px solid red;*/
 		}
 
 		h1{
@@ -421,24 +607,16 @@
 		}
 
 		button{
-			display: block;
-			width: 150px;
+			display: inline-block;
+			
 			font: inherit;
 			color: white;
 			text-align: left;
 			background: none;
 			border: none;
-			padding: 10px 0px;
+			padding: 5px;
 			position: relative;
-		}
-
-		button:after{
-			content: ">";
-			display: block;
-			position: absolute;
-			right: 0px;
-			top: 0px;
-			margin: 10px;
+			
 		}
 
 	</style>
