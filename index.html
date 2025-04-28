@@ -364,11 +364,11 @@
 
 			function doFlash(nWas,n,color){
 
-				for(var i=-KEYSPAN; i<KEYSPAN; i++){
+				for(var i=-KEYSPAN; i<=KEYSPAN; i++){
 					if(decayMap[nWas+i]) decayMap[nWas+i].decay = 0;
 				}
 
-				for(var i=-KEYSPAN; i<KEYSPAN; i++){
+				for(var i=-KEYSPAN; i<=KEYSPAN; i++){
 					if(decayMap[n+i]) decayMap[n+i].decay = 20 - Math.abs(i)*5;
 					if(decayMap[n+i]) decayMap[n+i].color = color;
 				}
@@ -461,7 +461,6 @@
 			addBreak();
 			addButton('white','spin-rainbow',function(){ fnStep = doStepRainbow; });
 			addBreak();
-			addBreak();
 			addButton('blue','left',function(){ 
 				audio.play('blip',true);
 				fnStep = undefined; 
@@ -503,7 +502,6 @@
 			addButton('white','woosh',function(){ audio.play('woosh',true); doColor('white'); fnStep = doStepRainbow; });
 			addButton('orange','candles',function(){ doColor('off'); fnStep = doStepCandle; });
 			addButton('yellow','twinkle',function(){ doColor('off'); fnStep = doStepTwinkle; });
-			addBreak();
 			addBreak();
 			addButton('white','midi-split',function(){ doPianoMode(true,true); });
 			addButton('blue','midi-piano',function(){ doPianoMode(true,false); });
