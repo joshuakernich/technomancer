@@ -304,6 +304,10 @@
 				$('<br>').appendTo('debug');
 			}
 
+			function addHR(){
+				$('<hr>').appendTo('debug');
+			}
+
 			let pendingOff = [];
 			function doTwinkleOff(){
 				pendingOff = littles.concat();
@@ -458,9 +462,9 @@
 			addButton('green','spin-g',function(){ colorStep='green'; fnStep = doStepSpin; });
 			addButton('blue','spin-b',function(){ colorStep='blue'; fnStep = doStepSpin; });
 			addButton('white','spin-w',function(){ colorStep='white'; fnStep = doStepSpin; });
-			addBreak();
 			addButton('white','spin-rainbow',function(){ fnStep = doStepRainbow; });
 			addBreak();
+			addHR();
 			addButton('blue','left',function(){ 
 				audio.play('blip',true);
 				fnStep = undefined; 
@@ -498,11 +502,13 @@
 			
 
 			addBreak();
+			addHR();
 			addButton('white','flash',function(){ audio.play('boom',true); doColor('white', 1); doDecay('white'); });
 			addButton('white','woosh',function(){ audio.play('woosh',true); doColor('white'); fnStep = doStepRainbow; });
 			addButton('orange','candles',function(){ doColor('off'); fnStep = doStepCandle; });
 			addButton('yellow','twinkle',function(){ doColor('off'); fnStep = doStepTwinkle; });
 			addBreak();
+			addHR();
 			addButton('white','midi-split',function(){ doPianoMode(true,true); });
 			addButton('blue','midi-piano',function(){ doPianoMode(true,false); });
 			addButton('red','midi-korg',function(){ doPianoMode(false,true); });
@@ -510,26 +516,33 @@
 			addButton('blue','test-piano',function(){ doPianoKey(); });
 			addButton('red','test-korg',function(){ doKorgKey(); });
 			addBreak();
-			
+			addHR();
 			addButton('white','off',function(){ fnStep=undefined; doColor('off'); });
 		})
 
 		
 	</script>
 	<style type="text/css">
+		@font-face {
+			font-family: "body";
+			src: url("./ArchivoNarrow-VariableFont_wght.ttf");
+			
+		}
+
 		body{
 			background: black;
 			color: black;
-			font-family: monospace;
+			font-family: 'body';
 			background: url(./bg.gif);
 			background-size: 110%;
 			background-position: center;
-
+			text-transform: uppercase;
 			overflow: hidden;
 			width: 100vw;
 			height: 100vh;
 			margin: 0px;
 			padding: 0px;
+			font-size: 12px;
 		}
 
 		bpm{
@@ -640,6 +653,8 @@
 			border: none;
 			padding: 5px;
 			position: relative;
+
+			text-transform: uppercase;
 			
 		}
 
