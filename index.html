@@ -34,12 +34,15 @@
 				'white':[255,255,255,255],
 				'red':[255,0,0,0],
 				'green':[0,255,0,0],
+				'cyan':[0,255,255,0],
 				'blue':[0,0,255,0],
+				'pink':[255,0,127,0],
 				'purple':[255,0,255,0],
 				'yellow':[255,255,0,0],
+				'orange':[255,127,0,0],
 			}
 
-			const PALETTE = ['red','green','blue','purple','yellow'];
+			const PALETTE = ['yellow','orange','red','pink','purple','blue','cyan','green'];
 
 			let littles = [];
 			let bigs = [];
@@ -51,9 +54,9 @@
 
 				littles[i] = new Light(LOW+i);
 				littles[i].$el.appendTo($anchor).css({
-					left: Math.sin(-r) * 30 + 'vh',
-					top: Math.cos(-r) * 30 + 'vh',
-					transform: 'translate(-50%, -50%) rotate('+(r)+'rad)',
+					left: Math.sin(r) * 30 + 'vh',
+					top: Math.cos(r) * 30 + 'vh',
+					transform: 'translate(-50%, -50%) rotate('+(-r)+'rad)',
 				});
 			}
 
@@ -74,26 +77,36 @@
 			}
 
 
+			const KEYSPAN = 2;
+			let midiKorg = {min:0,max:0,enabled:false,n:-99,color:COLORS['off']};
+			let midiPiano = {min:0,max:0,enabled:false,n:-99,color:COLORS['off']};
+
 			let pianoPulse = [];
-			let nKorg = Math.round( littles.length * 0.25 );
-			let nPiano = Math.round( littles.length * 0.75 );
 			function doMidiKey(isMinilogue){
+
 				nKey++;
 				if(isMinilogue) doKorgKey();
-				else doPianoKey();
+				elsedoPianoKey();
 				//for(var n in bigs) bigs[n].setColor(cycle[nKey%cycle.length]).commit();
 				//for(var n in littles) littles[n].setColor(cycle[nKey%cycle.length]).commit();
 			}
 
+			
+
+			function getNforSpan(min,max){
+				return min + KEYSPAN + Math.floor( Math.random()*(max-min-KEYSPAN*2) );
+			}
+
 			function doKorgKey(){
-				nKorg = Math.round( (0.1 + Math.random() * 0.3)*littles.length );
+				if(!midiKorg.enabled) return;
+				midiKorg.n = getNforSpan( midiKorg.min, midiKorg.max );
 				/*if(pianoPulse.length && (pianoPulse[0].n + (pianoPulse[0].size+2)) > littles.length) return; // prevent overlap
 				pianoPulse.unshift({ n:littles.length, size:2, dir:-1, color:'blue', min:COUNT/2, max:COUNT });*/
 			}
 
 			function doPianoKey(){
-				
-				nPiano = Math.round( (0.6 + Math.random() * 0.3)*littles.length );
+				if(!midiPiano.enabled) return;
+				midiPiano.n =  getNforSpan( midiPiano.min, midiPiano.max );
 				/*if(pianoPulse.length && (pianoPulse[0].n - (pianoPulse[0].size+1)) < 0) return; //prevent overlap
 				console.log('doKorgKey');
 				pianoPulse.unshift({ n:-1, size:2, dir:1, color:'red', min:0, max:COUNT/2 });*/
@@ -318,73 +331,76 @@
 				littles[nTwinkle].setColor('white',0.1).commit();
 			}
 
-			function doPianoMode(){
+			function doPianoMode( bPiano, bKorg ){
 				doColor('off');
-				//fnStep = doStepPianoPulse;
+
+				midiPiano.enabled = midiKorg.enabled = false;
+
+				if(bPiano && bKorg){
+					midiKorg.min = 0;
+					midiKorg.max = littles.length/2-1;
+					midiPiano.min = littles.length/2;
+					midiPiano.max = littles.length-1;
+					midiKorg.enabled = midiPiano.enabled = true;
+				} else if(bPiano){
+					midiPiano.min = 0;
+					midiPiano.max = littles.length-1;
+					midiPiano.enabled = true;
+				} else if(bKorg){
+					midiKorg.min = 0;
+					midiKorg.max = littles.length-1;
+					midiKorg.enabled = true;
+				}
+
 				fnStep = doStepPiano;
 			}
 
 			const FPDECAY = 30;
 			const FPFADESTEP = 2;
 
-			let nKorgWas = nKorg;
-			let nPianoWas = nPiano;
-
-			let colorKorg = [0,0,0,0];
-			let colorPiano = [0,0,0,0];
 
 			let decayMap = [];
-			for(var i in littles) decayMap[i] = -1;
+			for(var i in littles) decayMap[i] = {decay:0,color:[]};
+
+			function doFlash(nWas,n,color){
+
+				for(var i=-KEYSPAN; i<KEYSPAN; i++){
+					if(decayMap[nWas+i]) decayMap[nWas+i].decay = 0;
+				}
+
+				for(var i=-KEYSPAN; i<KEYSPAN; i++){
+					if(decayMap[n+i]) decayMap[n+i].decay = 20 - Math.abs(i)*5;
+					if(decayMap[n+i]) decayMap[n+i].color = color;
+				}
+			}
 
 			function doStepPiano(){
 
-				if(nKorg != nKorgWas){
-					decayMap[nKorgWas-2] = 0;
-					decayMap[nKorgWas-1] = 0;
-					decayMap[nKorgWas] = 0;
-					decayMap[nKorgWas+1] = 0;
-					decayMap[nKorgWas+2] = 0;
-
-					nKorgWas = nKorg;
-
-					decayMap[nKorgWas-2] = 10;
-					decayMap[nKorgWas-1] = 15;
-					decayMap[nKorgWas] = 20;
-					decayMap[nKorgWas+1] = 15;
-					decayMap[nKorgWas+2] = 10;
-
-					colorKorg = [255,Math.floor(Math.random()*255),0,0];
+				if(midiKorg.n != midiKorg.nWas){
+					let color = [255,Math.floor(Math.random()*255),0,0];
+					doFlash(midiKorg.nWas,midiKorg.n,color);
+					midiKorg.nWas = midiKorg.n;
 				}
 
-				if(nPiano != nPianoWas){
-
-					decayMap[nPianoWas-2] = 0;
-					decayMap[nPianoWas-1] = 0;
-					decayMap[nPianoWas] = 0;
-					decayMap[nPianoWas+1]= 0;
-					decayMap[nPianoWas+2]= 0;
-
-					nPianoWas = nPiano;
-
-					decayMap[nPianoWas-2] = 10;
-					decayMap[nPianoWas-1] = 15;
-					decayMap[nPianoWas] = 20;
-					decayMap[nPianoWas+1] = 15;
-					decayMap[nPianoWas+2] = 10;
-
-					colorPiano = [0,Math.floor(Math.random()*255),100+Math.floor(Math.random()*155),0];
+				if(midiPiano.n != midiPiano.nWas){
+					let color = [0,Math.floor(Math.random()*255),100+Math.floor(Math.random()*155),0];
+					doFlash(midiPiano.nWas,midiPiano.n,color);
+					midiPiano.nWas = midiPiano.n;
 				}
 
-				
-
-				for(var i in decayMap){
-					if(decayMap[i] >= 0 && decayMap[i]%FPFADESTEP==0){
-						let c =  i>littles.length/2?colorPiano:colorKorg;
-						littles[i].setRGBWO( c[0], c[1], c[2], c[3], decayMap[i]/FPDECAY).commit();
-						//littles[i].setColor(, decayMap[i]/FPDECAY ).commit();
+				for(var i in littles){
+					if(decayMap[i].decay >= 0 && decayMap[i].decay%FPFADESTEP==0){
+						
+						littles[i].setRGBWO( 
+							decayMap[i].color[0], 
+							decayMap[i].color[1], 
+							decayMap[i].color[2], 
+							decayMap[i].color[3], 
+							decayMap[i].decay/FPDECAY).commit();
 					}
 				}
-				for(var i in decayMap) decayMap[i]--;
+				
+				for(var i in decayMap) decayMap[i].decay--;
 			}	
 
 
@@ -418,6 +434,11 @@
 
 			}
 
+			function doPalette(){
+				fnStep = undefined;
+				for(var i in littles) littles[i].setColor( PALETTE[i%PALETTE.length]);
+			}
+
 
 			const FPS = 20;
 			let fnStep = undefined;
@@ -430,6 +451,7 @@
 			setInterval(step,1000/FPS);
 
 			addButton('white','text-next',doNextRed);
+			addButton('white','palette',doPalette);
 			
 			addBreak();
 			addButton('red','spin-r',function(){ colorStep='red'; fnStep = doStepSpin; });
@@ -440,16 +462,17 @@
 			addButton('white','spin-rainbow',function(){ fnStep = doStepRainbow; });
 			addBreak();
 			addBreak();
-			addButton('red','left',function(){ 
+			addButton('blue','left',function(){ 
 				audio.play('blip',true);
-				fnStep = undefined; 
-				for(var n=0; n<littles.length; n++) littles[n].setColor(n<littles.length/2?'red':'off').commit(); 
-			})
-			addButton('blue','right',function(){ 
-				audio.play('blip-low',true);
 				fnStep = undefined; 
 				for(var n=0; n<littles.length; n++) littles[n].setColor(n>=littles.length/2?'blue':'off').commit(); 
 			})
+			addButton('red','right',function(){ 
+				audio.play('blip-low',true);
+				fnStep = undefined; 
+				for(var n=0; n<littles.length; n++) littles[n].setColor(n<littles.length/2?'red':'off').commit(); 
+			})
+			
 			
 			addButton('white','left-right',doLeftRight);
 			
@@ -482,9 +505,12 @@
 			addButton('yellow','twinkle',function(){ doColor('off'); fnStep = doStepTwinkle; });
 			addBreak();
 			addBreak();
-			addButton('white','midi-start',function(){ doPianoMode(); });
-			addButton('blue','midi-piano',function(){ doPianoKey(); });
-			addButton('red','midi-korg',function(){ doKorgKey(); });
+			addButton('white','midi-split',function(){ doPianoMode(true,true); });
+			addButton('blue','midi-piano',function(){ doPianoMode(true,false); });
+			addButton('red','midi-korg',function(){ doPianoMode(false,true); });
+			addBreak();
+			addButton('blue','test-piano',function(){ doPianoKey(); });
+			addButton('red','test-korg',function(){ doKorgKey(); });
 			addBreak();
 			
 			addButton('white','off',function(){ fnStep=undefined; doColor('off'); });
