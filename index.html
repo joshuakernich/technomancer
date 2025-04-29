@@ -331,19 +331,28 @@
 
 			function doColor(color, opacity=1){
 				
-				for(var n in littles){
+				for(var n in decayMap){
 					let c = (color=='random')?PALETTE[Math.floor(Math.random()*PALETTE.length)]:color;
-					littles[n].setColor(c, opacity).commit();
+					decayMap[n].color = COLORS[c];
+					decayMap[n].decay = FPDECAY;
 				}
+
+				doStepDecay();
 			}
 
 			let nx = -1;
 			let ny = 0;
 			let $btns = [];
-			function addButton(color,str,fn){
+			function addButton(isMode,color,str,fn){
 				nx++;
 				launchpad.setXY(0,nx,ny,color);
-				$btns.push( $(`<button x=${nx} y=${ny}>${str}</button>`).appendTo('debug').click(fn) );
+				$btns.push( $(`<button x=${nx} y=${ny}>${str}</button>`).appendTo('debug').click(function(){
+					if(isMode){
+						$('button').attr('active',false);
+						$(this).attr('active',true);
+					} 
+					fn();
+				}) );
 			}
 
 			function addBreak(){
@@ -482,7 +491,7 @@
 				let half = littles.length/2;
 				for(var i=0; i<half; i++){
 
-					if(i<amt*half){
+					if(i<amt*half && decayMap[i].decay<=(10-FPFADESTEP) ){
 						decayMap[i].decay = 10;
 						decayMap[littles.length-1-i].decay = 10;
 					}
@@ -506,31 +515,31 @@
 			let timeStart = new Date().getTime();
 			setInterval(step,1000/FPS);
 
-			addButton('white','text-next',doNextRed);
-			addButton('white','palette',doPalette);
-			addButton('white','amplitude',doAmplitudeMode);
+			addButton(false,'white','text-next',doNextRed);
+			addButton(true,'white','palette',doPalette);
+			addButton(true,'white','amplitude',doAmplitudeMode);
 			
 			addBreak();
-			addButton('red','spin-r',function(){ colorStep='red'; fnStep = doStepSpin; });
-			addButton('green','spin-g',function(){ colorStep='green'; fnStep = doStepSpin; });
-			addButton('blue','spin-b',function(){ colorStep='blue'; fnStep = doStepSpin; });
-			addButton('white','spin-w',function(){ colorStep='white'; fnStep = doStepSpin; });
-			addButton('white','spin-rainbow',function(){ fnStep = doStepRainbow; });
+			addButton(true,'red','spin-r',function(){ colorStep='red'; fnStep = doStepSpin; });
+			addButton(true,'green','spin-g',function(){ colorStep='green'; fnStep = doStepSpin; });
+			addButton(true,'blue','spin-b',function(){ colorStep='blue'; fnStep = doStepSpin; });
+			addButton(true,'white','spin-w',function(){ colorStep='white'; fnStep = doStepSpin; });
+			addButton(true,'white','spin-rainbow',function(){ resetDecay(); fnStep = doStepRainbow; });
 			addBreak();
 			addHR();
-			addButton('blue','left',function(){ 
+			addButton(true,'blue','left',function(){ 
 				audio.play('blip',true);
 				fnStep = undefined; 
 				for(var n=0; n<littles.length; n++) littles[n].setColor(n>=littles.length/2?'blue':'off').commit(); 
 			})
-			addButton('red','right',function(){ 
+			addButton(true,'red','right',function(){ 
 				audio.play('blip-low',true);
 				fnStep = undefined; 
 				for(var n=0; n<littles.length; n++) littles[n].setColor(n<littles.length/2?'red':'off').commit(); 
 			})
 			
 			
-			addButton('white','left-right',doLeftRight);
+			addButton(true,'white','left-right',doLeftRight);
 			
 			function doLeftRight(){
 				audio.play('blip',true);
@@ -554,21 +563,21 @@
 
 			addBreak();
 			addHR();
-			addButton('white','flash',function(){ audio.play('boom',true); doColor('white', 1); doDecay('white'); });
-			addButton('white','woosh',function(){ audio.play('woosh',true); doColor('white'); fnStep = doStepRainbow; });
-			addButton('orange','candles',function(){ doColor('off'); resetDecay(); fnStep = doStepCandle; });
-			addButton('yellow','twinkle',function(){ doColor('off'); resetDecay(); fnStep = doStepTwinkle; });
+			addButton(true,'white','flash',function(){ audio.play('boom',true); doColor('white', 1); doDecay('white'); });
+			addButton(true,'white','woosh',function(){ audio.play('woosh',true); doColor('white'); fnStep = doStepRainbow; });
+			addButton(true,'orange','candles',function(){ doColor('off'); fnStep = doStepCandle; });
+			addButton(true,'yellow','twinkle',function(){ doColor('off'); fnStep = doStepTwinkle; });
 			addBreak();
 			addHR();
-			addButton('white','midi-split',function(){ doPianoMode(true,true); });
-			addButton('blue','midi-piano',function(){ doPianoMode(true,false); });
-			addButton('red','midi-korg',function(){ doPianoMode(false,true); });
+			addButton(true,'white','midi-split',function(){ doPianoMode(true,true); });
+			addButton(true,'blue','midi-piano',function(){ doPianoMode(true,false); });
+			addButton(true,'red','midi-korg',function(){ doPianoMode(false,true); });
 			addBreak();
-			addButton('blue','test-piano',function(){ midiPiano.fn( midiPiano ); });
-			addButton('red','test-korg',function(){ midiKorg.fn( midiKorg ); });
+			addButton(false,'blue','test-piano',function(){ midiPiano.fn( midiPiano ); });
+			addButton(false,'red','test-korg',function(){ midiKorg.fn( midiKorg ); });
 			addBreak();
 			addHR();
-			addButton('white','off',function(){ fnStep=undefined; doColor('off'); });
+			addButton(true,'white','off',function(){ fnStep=undefined; doColor('off'); });
 		})
 
 		
@@ -708,6 +717,11 @@
 
 			text-transform: uppercase;
 			
+		}
+
+		button[active=true]{
+			color:yellow;
+			border-bottom: 1px solid yellow;
 		}
 
 	</style>
