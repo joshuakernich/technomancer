@@ -40,7 +40,7 @@
 
 			const LOW = 10;
 			const HIGH = 25;
-			const COUNT = 40;
+			const COUNT = 38;
 
 			let audio = new AudioContext();
 			audio.add('blip','./audio/sfx-blip.mp3');
@@ -68,7 +68,14 @@
 			const PALETTE = ['yellow','orange','red','pink','purple','blue','cyan','green'];
 
 			let littles = [];
-			let bigs = [];
+			let bigs = [
+				new Light(101),
+				new Light(102),
+				new Light(LOW+39),
+			];
+
+			bigs[0].setColor('red').commit();
+			bigs[1].setColor('blue').commit();
 
 			let $anchor = $('<anchor>').appendTo('body');
 			for(var i=0; i<COUNT; i++){
@@ -122,6 +129,7 @@
 
 			function doMidiKey(isMinilogue){
 				nKey++;
+
 				if(isMinilogue) midiKorg.fn( midiKorg );
 				else midiPiano.fn( midiPiano );
 			}
@@ -137,6 +145,7 @@
 
 			function doKeyFlash( midi ) {
 				if(!midi.enabled) return;
+
 				midi.n = getNforSpan( midi.min, midi.max );
 				midi.color = getColorForMidi( midi );
 				doFlashAt(midi.nWas,midi.n,midi.color);
@@ -319,7 +328,7 @@
 
 			function doStepCandle(){
 				let n = getNextInQueue();
-				decayMap[n].color = [60+Math.random()*20,20+Math.random()*20,0,0];
+				decayMap[n].color = [150+Math.random()*105,40+Math.random()*40,0,0];
 				decayMap[n].decay = FPDECAY * 3;
 				doStepDecay();
 			}
@@ -347,6 +356,10 @@
 			}
 
 			function doColor(color, opacity=1){
+
+				midiKorg.active = midiPiano.active = false;
+				fnStep = undefined;
+				if(color=='off') opacity = 0;
 				
 				for(var n in decayMap){
 					let c = (color=='random')?PALETTE[Math.floor(Math.random()*PALETTE.length)]:color;
@@ -358,7 +371,7 @@
 			}
 
 			let nx = -1;
-			let ny = 0;
+			let ny = -1;
 			let $btns = [];
 			function addButton(isMode,color,str,fn){
 				nx++;
@@ -379,13 +392,15 @@
 			}
 
 			function addHR(title){
+				nx = -1;
+				ny++;
 				$('<hr>').appendTo('debug');
 				$('<h2>').appendTo('debug').text(title);
 			}
 
 			function doDecay(color){
 				for(var i in decayMap){
-					decayMap[i].decay = FPDECAY + FPFADESTEP;
+					decayMap[i].decay = FPDECAY + FPFADESTEP + i%3;
 					decayMap[i].color = COLORS['white'];
 				}
 				fnStep = doStepDecay;
@@ -412,12 +427,19 @@
 
 				if(cntParty%FPPARTY==0){
 					let n = Math.floor(Math.random()*littles.length);
-					let color = COLORS[ PALETTE[ Math.floor(Math.random()*PALETTE.length) ]];
-					doFlashAt(nPartyFlash,n,color);
+					let c = PALETTE[ Math.floor(Math.random()*PALETTE.length) ];
+					let color = COLORS[ c ];
+					doFlashAt(nPartyFlash,n,color,6);
 					nPartyFlash = n;
+
+					//bigs[0].setColor(c).commit();
+					//bigs[1].setColor(c).commit();
+					commitDecay();
 				}
 
-				doStepDecay();
+
+
+				//doStepDecay();
 			}
 
 			let cntQubit = 0;
@@ -472,13 +494,15 @@
 				fnStep = doStepDecay;
 			}
 
-			function doFlashAt(nWas,n,color){
+			function doFlashAt(nWas,n,color,keyspan){
 
-				for(var i=-KEYSPAN; i<=KEYSPAN; i++){
+				if(!keyspan) keyspan = KEYSPAN;
+
+				for(var i=-keyspan; i<=keyspan; i++){
 					if(decayMap[nWas+i]) decayMap[nWas+i].decay = 0;
 				}
 
-				for(var i=-KEYSPAN; i<=KEYSPAN; i++){
+				for(var i=-keyspan; i<=keyspan; i++){
 					if(decayMap[n+i]) decayMap[n+i].decay = 21 - Math.abs(i)*5;
 					if(decayMap[n+i]) decayMap[n+i].color = color;
 				}
@@ -535,6 +559,7 @@
 			}
 
 			function doFlash(){
+				fnStep = undefined;
 				audio.play('boom',true);
 				//doColor('white', 1);
 				doDecay('white');
@@ -559,7 +584,7 @@
 			
 			let fnStep = undefined;
 			function step() {
-
+				
 				if(fnStep) fnStep();
 			}
 
@@ -578,7 +603,7 @@
 
 			addHR('dance party');
 			addButton(true,'red','party',function(){ audio.play('woosh',true); doColor('off'); fnStep = doStepParty; });
-
+			addButton(true,'green','palette',doPalette);
 			addHR('polarities');
 			addButton(true,'white','flash', doFlash );
 			addButton(true,'blue','left',function(){ 
@@ -592,9 +617,12 @@
 				for(var n=0; n<littles.length; n++) littles[n].setColor(n<littles.length/2?'red':'off').commit(); 
 			})
 			
-			addButton(true,'white','left-right', function(){ doLeftRight('red','blue'); });
+			addButton(true,'white','left-right', function(){ doLeftRight(4,'red','blue'); });
+			addButton(true,'red','love', function(){ doColor('red')});
 			
-			function doLeftRight(colorLeft,colorRight){
+			let distLeftRight = 1;
+			function doLeftRight(dist,colorLeft,colorRight){
+				distLeftRight = dist;
 				audio.play('blip',true);
 				audio.play('blip-low',true);
 				for(var n=0; n<littles.length; n++) littles[n].setColor(n<littles.length/2?colorLeft:colorRight).commit(); 
@@ -605,7 +633,7 @@
 			let nFocus = 0;
 			function doStepLeftRight(){
 				nFocus++;
-				if(nFocus>=0 && nFocus<=7){
+				if(nFocus>=0 && nFocus<=(COUNT/4-distLeftRight)){
 					littles[nFocus].setColor('off').commit();
 					littles[COUNT-nFocus-1].setColor('off').commit();
 					littles[COUNT/2-nFocus-1].setColor('off').commit();
@@ -624,14 +652,23 @@
 			}
 
 			let queueRandom = [];
+
+			
+
+			let nYou = 0;
 			function doRandomRed(){
+				
 				audio.play('blip',true);
 
-				if(!queueRandom.length) doColor('off');
+				doColor('off');
 
-				let n = getNextInQueue();
+				nYou++;
 
-				decayMap[n].color = COLORS['red'];
+				let n = Math.floor( (0.25 + (nYou%2)*0.5 - 0.1 + Math.random()*0.2)*littles.length );
+
+				let nColor = Math.floor(Math.random()*PALETTE.length);
+
+				decayMap[n].color = COLORS[PALETTE[nColor]];
 				decayMap[n].decay = FPDECAY;
 
 				commitDecay();
@@ -640,18 +677,19 @@
 
 			addHR('prophecy');
 			addButton(true,'white','begin', doFlash );
-			addButton(true,'white','qubit',function(){ fnStep = doStepQubit; });
-			addButton(true,'white','light',function(){ audio.play('woosh',true); doColor('white'); fnStep = doStepRainbow; });
-			addButton(true,'white','consciousness',function(){ doLeftRight('white','white'); });
-			addButton(true,'white','spread',function(){ audio.play('woosh',true); doPalette(4); });
-			addButton(true,'white','you', doRandomRed );
-			addButton(true,'white','fade',function(){ fnStep=doStepDecay; });
+			addButton(true,'blue','qubit',function(){ doColor('off'); fnStep = doStepQubit; });
+			//addButton(true,'green','light',function(){ audio.play('woosh',true); doColor('white'); fnStep = doStepRainbow; });
+			addButton(true,'white','light',function(){ audio.play('woosh',true); doColor('white'); });
+			addButton(true,'white','consciousness',function(){ doLeftRight(2,'white','white'); });
+			addButton(true,'green','spread',function(){ audio.play('woosh',true); doPalette(); });
+			addButton(true,'red','you', doRandomRed );
 			addButton(true,'orange','entropy',function(){ doColor('off'); fnStep = doStepCandle; });
-			addButton(true,'orange','fadeUp',function(){ fnStep = doStepIntensify; });
+			addButton(true,'white','fadeUp',function(){ fnStep = doStepIntensify; });
 			addHR('oracle');
 			addButton(true,'white','begin', function(){ doFlash(); doPianoMode(true,false); });
+			addButton(true,'blue','piano', function(){ doColor('off'); doPianoMode(true,false); });
 			addButton(true,'white','fadeUp', function(){ doColor('white',0); fnStep = doStepIntensify; });
-			addHR('piano');
+			/*addHR('piano');
 			addButton(true,'white','amplitude',doAmplitudeMode);
 			addButton(true,'white','midi-split',function(){ doPianoMode(true,true); });
 			addButton(true,'blue','midi-piano',function(){ doPianoMode(true,false); });
@@ -659,13 +697,16 @@
 			addBreak();
 			addButton(false,'blue','test-piano',function(){ midiPiano.fn( midiPiano ); });
 			addButton(false,'red','test-korg',function(){ midiKorg.fn( midiKorg ); });
-			addBreak();
-			addHR();
+			addBreak();*/
+			addHR('utility');
 			//addButton(true,'blue','ripples',function(){ isDecayRipple=true; });
-			addButton(true,'white','off',function(){ fnStep=undefined; doColor('off'); });
-			addButton(false,'white','text-next',doNextRed);
-			addButton(true,'white','palette',doPalette);
-			addButton(true,'yellow','twinkle',function(){ doColor('off'); fnStep = doStepTwinkle; });
+			addButton(true,'white','off',function(){ 
+				fnStep=undefined;
+				doColor('off');
+				//for(var b in bigs) bigs[b].setColor('off').commit();
+			});
+			/*addButton(false,'white','text-next',doNextRed);
+			addButton(true,'yellow','twinkle',function(){ doColor('off'); fnStep = doStepTwinkle; });*/
 		})
 
 		
@@ -690,7 +731,7 @@
 			height: 100vh;
 			margin: 0px;
 			padding: 0px;
-			font-size: 12px;
+			font-size: 25px;
 		}
 
 		bpm{
